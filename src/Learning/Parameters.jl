@@ -64,7 +64,7 @@ function backpropagate!(diff::Vector{Float64}, circ::Vector{Node}, values::Vecto
 end
 
 function pbackpropagate_tree!(Δ::AbstractMatrix{<:Real}, C::Vector{Node}, V::AbstractMatrix{<:Real};
-    indicators::Union{AbstractVector{<:Integer}, Nothing} = nothing)
+  indicators::Union{AbstractVector{<:Integer}, Nothing} = nothing)
   # lim = -floatmax(eltype(Δ))
   if isnothing(indicators)
     Δ .= 0.0
@@ -84,8 +84,8 @@ function pbackpropagate_tree!(Δ::AbstractMatrix{<:Real}, C::Vector{Node}, V::Ab
     # Columns: nodes
     for i ∈ m:-1:1 # from root to leaves
       N = C[i]
-      d = view(Δ, R, i)
       if isleaf(N) continue end
+      d = view(Δ, R, i)
       if issum(N)
         for (j, c) ∈ enumerate(N.children)
           if C[c] isa Indicator
@@ -200,48 +200,6 @@ function backpropagate_tree!(diff::AbstractVector{<:Real}, circ::Vector{Node}, l
     end
   end
   return nothing
-end
-
-# compute log derivatives (not working!)
-function logbackpropagate!(r::Node, values::Vector{Float64}, diff::Vector{Float64})
-  # Assumes network has been evaluted at some assignment using logpdf!
-  # Backpropagate derivatives
-  @assert length(diff) == length(circ) == length(values)
-  # create storage for each computed value (message from parent to child)
-  from = []
-  to = []
-  for i in 1:length(circ)
-    if isa(circ[i], Sum) || isa(circ[i], Product)
-      for j in children(circ, i)
-        push!(from, i)
-        push!(to, j)
-      end
-    end
-  end
-  cache = sparse(to, from, ones(Float64, length(to)))
-  #fill!(diff,0.0)
-  logdiff = zeros(Float64, length(diff))
-  for i in 1:length(circ)
-    if i == 1
-      diff[i] == 1.0
-    else
-      cache_vals = nonzeros(cache[i, :]) # incoming arc values
-      offset = maximum(cache_vals)
-      logdiff[i] = offset + log(sum(exp.(cache_vals .- offset)))
-      diff[i] = isfinite(logdiff[i]) ? exp(logdiff[i]) : 0.0
-    end
-    if isa(circ[i], Sum)
-      for j in children(circ, i)
-        #@inbounds diff[j] += getweight(circ,i,j)*diff[i]
-        cache[j, i] = logweight(circ, i, j) + logdiff[i]
-      end
-    elseif isa(circ[i], Product)
-      for j in children(circ, i)
-        #@inbounds diff[j] += diff[i]*exp(values[i]-values[j])
-        cache[j, i] = logdiff[i] + values[i] - values[j]
-      end
-    end
-  end
 end
 
 """

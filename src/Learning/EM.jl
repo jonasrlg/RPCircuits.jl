@@ -44,12 +44,16 @@ circ[i].weights[j] = circ[i].weights[k] * backpropagate(circ)[i]/sum(circ[i].wei
 """
 function update(
   learner::SEM,
-  Data::AbstractMatrix,
+  Data::AbstractMatrix;
   learningrate::Float64 = 1.0,
   smoothing::Float64 = 1e-4,
   learngaussians::Bool = false,
-  minimumvariance::Float64 = learner.minimumvariance;
-  verbose::Bool = false, validation::AbstractMatrix = Data, history = nothing, binary::Bool = false
+  minimumvariance::Float64 = learner.minimumvariance,
+  verbose::Bool = false, 
+  validation::AbstractMatrix = Data, 
+  history = nothing, 
+  counter::Int64 = 2,
+  binary::Bool = false
 )
 
   numrows, numcols = size(Data)
@@ -128,17 +132,19 @@ function update(
     end
   end
 
-  if verbose && (learner.steps % 2 == 0)
-    print("Training LL: ", sum(LL)/numrows, " | ")
-    n = size(validation, 1)
-    if n <= numrows
-      ll = mLL!(view(V, 1:n, :), curr, validation)
+  if learner.steps % counter == 0
+    m = size(validation, 1)
+    # Computes Training LL before using the matrix V for validation
+    if verbose trainLL = sum(LL)/numrows end
+    if m <= numrows
+      ll = mLL!(view(V, 1:m, :), curr, validation)
     else
-      ll = mLL!(Matrix{Float64}(undef, n, length(curr)), curr, validation)
+      ll = mLL!(Matrix{Float64}(undef, m, length(curr)), curr, validation)
     end
-    # if any(isnan, ll) println("break -3"); return -3, V, Δ, ll end
     if !isnothing(history) push!(history, ll) end
-    println("Iteration $(learner.steps). η: $(learningrate), LL: $(ll)")
+    if verbose
+      println("Training LL: ", trainLL, " | Iteration $(learner.steps). η: $(learningrate), LL: $(ll)")
+    end
   end
 
   swap!(learner.circ)
@@ -154,12 +160,15 @@ export update
 function oupdate(
   learner::SEM,
   Data::AbstractMatrix,
-  batchsize::Integer,
+  batchsize::Integer;
   learningrate::Float64 = 1.0,
   smoothing::Float64 = 1e-4,
   learngaussians::Bool = false,
-  minimumvariance::Float64 = learner.minimumvariance;
-  verbose::Bool = false, validation::AbstractMatrix = Data, history = nothing
+  minimumvariance::Float64 = learner.minimumvariance,
+  verbose::Bool = false, 
+  validation::AbstractMatrix = Data,
+  history = nothing,
+  counter::Int64 = 2,
 )
 
   numrows, numcols = size(Data)
@@ -238,16 +247,19 @@ function oupdate(
     # S.weights .= u / sum(u)
   end
 
-  if verbose && (learner.steps % 2 == 0)
-    print("Training LL: ", ll/numrows, " | ")
+  if learner.steps % counter == 0
     m = size(validation, 1)
+    # Computes Training LL before using the matrix V for validation
+    if verbose trainLL = ll/numrows end
     if m <= batchsize
       ll = mLL!(view(V, 1:m, :), curr, validation)
     else
       ll = mLL!(Matrix{Float64}(undef, m, length(curr)), curr, validation)
     end
     if !isnothing(history) push!(history, ll) end
-    println("Iteration $(learner.steps). η: $(learningrate), LL: $(ll)")
+    if verbose
+      println("Training LL: ", trainLL, " | Iteration $(learner.steps). η: $(learningrate), LL: $(ll)")
+    end
   end
 
   swap!(learner.circ)
@@ -261,12 +273,15 @@ export oupdate
 
 function old_update(
   learner::SEM,
-  Data::AbstractMatrix,
+  Data::AbstractMatrix;
   learningrate::Float64 = 1.0,
   smoothing::Float64 = 1e-4,
   learngaussians::Bool = false,
-  minimumvariance::Float64 = learner.minimumvariance;
-  verbose::Bool = false, validation::AbstractMatrix = Data, history = nothing
+  minimumvariance::Float64 = learner.minimumvariance,
+  verbose::Bool = false, 
+  validation::AbstractMatrix = Data, 
+  history = nothing,
+  counter::Int64 = 2,
 )
 
   numrows, numcols = size(Data)
@@ -341,10 +356,12 @@ function old_update(
     end
   end
 
-  if verbose && (learner.steps % 2 == 0)
+  if learner.steps % counter == 0
     ll = pNLL(values, curr, learner.circ.L, validation)
     if !isnothing(history) push!(history, ll) end
-    println("Iteration $(learner.steps). η: $(learningrate), NLL: $(ll)")
+    if verbose
+      println("Iteration $(learner.steps). η: $(learningrate), NLL: $(ll)")
+    end
   end
 
   swap!(learner.circ)
@@ -419,7 +436,7 @@ circ[i].weights[j] = circ[i].weights[k] * backpropagate(circ)[i]/sum(circ[i].wei
 """
 function update(
   learner::SQUAREM,
-  Data::AbstractMatrix,
+  Data::AbstractMatrix;
   smoothing::Float64 = 0.0001,
   learngaussians::Bool = false, # not implemented
   minimumvariance::Float64 = learner.minimumvariance,

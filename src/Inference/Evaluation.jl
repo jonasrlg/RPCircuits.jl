@@ -149,7 +149,7 @@ function mplogpdf!(V::AbstractMatrix{<:Real}, C::Vector{Node}, D::AbstractMatrix
   return view(V, :, k)
 end
 
-"Vectorized form of cplogpdf."
+"Vectorized form of cplogpdf. Assumes normalized weights"
 function mlogpdf!(V::AbstractMatrix{<:Real}, C::Vector{Node}, D::AbstractMatrix{<:Real})
   n, k = size(V)
   # Columns: nodes
@@ -165,6 +165,55 @@ function mlogpdf!(V::AbstractMatrix{<:Real}, C::Vector{Node}, D::AbstractMatrix{
   end
   return view(V, :, k)
 end
+
+" Computes the log of the circuit normalization constant."
+function log_norm_const(r::Node; gauss::Bool = false)
+  circuit = compile(CCircuit, r; gauss)
+  numnodes = length(circuit.C)
+  margV = Matrix{Float64}(undef, 1, numnodes) # margV[i] = log Ci(1)
+  marg_input = reshape(fill(NaN,numnodes), 1, numnodes)
+  return mplogpdf!(margV, circuit.C, marg_input)[1]
+end
+export log_norm_const
+
+" Update a circuit to its normalized form. Uses CCircuits."
+function vec_normalize_circuit!(C::Vector{Node}, sumnodes::Vector{UInt})
+  numnodes = length(C)
+  margV = Matrix{Float64}(undef, 1, numnodes) # margV[i] = log Ci(1)
+  marg_input = reshape(fill(NaN,numnodes), 1, numnodes)
+  mplogpdf!(margV, C, marg_input)
+  values = exp.(margV) # values[j] = Cj(1)
+
+  Threads.@threads for i ∈ 1:length(sumnodes)
+    s = sumnodes[i]
+    S = C[s]
+    weights = S.weights # old weights
+    u = Vector{Float64}(undef, length(S.children))
+    for (j, c) ∈ enumerate(S.children)
+      u[j] = values[c]*weights[j] # value of children C * weight between S and C
+    end
+    S.weights .= u./values[s] # local normalization
+  end
+end
+
+" Vectorizes the circuit given the root and normalize all sum weights."
+function normalize_circuit!(r::Node; gauss::Bool = false)
+  circuit = compile(CCircuit, r; gauss)
+  vec_normalize_circuit!(circuit.C, circuit.S)
+end
+
+export normalize_circuit!
+
+" For a given circuit C, over a set of variables Y, and a parcial state x over variables X ⊆ Y, 
+  this function outputs C(x),the marginalized value of C(x) over variables Y∖X."
+function marginalize(r::Node, state::AbstractVector{<:Real}, indices::Vector{Int})
+  input = fill(NaN, length(scope(r)))
+  for (value, index) ∈ zip(state, indices)
+    input[index] = value
+  end
+  return r(input)
+end
+export marginalize
 
 function cplogpdf!(
     V::AbstractVector{Float64},

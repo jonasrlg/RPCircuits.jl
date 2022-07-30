@@ -120,6 +120,14 @@ Is this a leaf node?
 @inline isleaf(n::Node) = isa(n, Leaf)
 export isleaf
 
+@inline isindicator(n::Node) = isa(n, Indicator)
+export isindicator
+@inline iscategorical(n::Node) = isa(n, Categorical)
+export iscategorical
+@inline isbernoulli(n::Node) = isa(n, Bernoulli)
+export isbernoulli
+@inline isgaussian(n::Node) = isa(n, Gaussian)
+
 """
 Is this a sum node?
 """
