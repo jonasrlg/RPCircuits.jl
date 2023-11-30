@@ -1,4 +1,3 @@
-using BlossomV
 using SimpleWeightedGraphs
 using DataFrames
 using SparseArrays
@@ -52,7 +51,6 @@ function top_down_v(data::DataFrame, M::Matrix; α)
     return f
 end
 
-"Blossom bottom up method, vars are not used"
 function bottom_up_v(data::DataFrame, M::Matrix; α)
     n, m = size(data)
     weight = ones(Float64, n)
@@ -63,17 +61,17 @@ function bottom_up_v(data::DataFrame, M::Matrix; α)
     function f(leaf::Vector{<:Vtree})
         variable_sets = collect.(variables.(leaf))
 
-        # even number of nodes, use blossomv alg
-        function blossom_bottom_up_even!(variable_sets)
+        # even number of nodes, use alg
+        function bottom_up_even!(variable_sets)
             # 1. calculate pMI
             pMI = ProbabilisticCircuits.Utils.set_mutual_information(info, variable_sets)
             pMI = round.(Int64, pMI)
 
-            # 2. solve by blossomv alg
+            # 2. solve by alg
             len = length(variable_sets)
-            m = BlossomV.Matching(len)
+            m = .Matching(len)
             for i in 1 : len, j in i + 1 : len
-                add_edge(m, i - 1, j - 1, pMI[i, j]) # blossomv index start from 0
+                add_edge(m, i - 1, j - 1, pMI[i, j]) #  index start from 0
             end
 
             solve(m)
@@ -95,13 +93,13 @@ function bottom_up_v(data::DataFrame, M::Matrix; α)
         end
 
         # odd number of nodes, try every 2 combinations
-        function blossom_bottom_up_odd!(variable_sets)
+        function bottom_up_odd!(variable_sets)
             # try all len - 1 conditions, find best score(minimun cost)
             (best_matches, best_score) = (nothing, typemax(Int64))
             len = length(variable_sets)
             for index in 1 : len
                 indices = [collect(1:index-1);collect(index+1:len)]
-                (matches, score) = blossom_bottom_up_even!(variable_sets[indices])
+                (matches, score) = bottom_up_even!(variable_sets[indices])
                 if score < best_score
                     (best_matches, best_score) = ([[(indices[l], indices[r]) for (l,r) in matches];[index]], score)
                 end
@@ -110,9 +108,9 @@ function bottom_up_v(data::DataFrame, M::Matrix; α)
         end
 
         if length(variable_sets) % 2 == 0
-            (matches, score) = blossom_bottom_up_even!(variable_sets)
+            (matches, score) = bottom_up_even!(variable_sets)
         else
-            (matches, score) = blossom_bottom_up_odd!(variable_sets)
+            (matches, score) = bottom_up_odd!(variable_sets)
         end
 
         pairs = []

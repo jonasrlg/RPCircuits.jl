@@ -4,7 +4,6 @@ using Random
 using Serialization
 using Printf
 
-using BlossomV
 using ProbabilisticCircuits: learn_vtree
 using LogicCircuits: Vtree
 using DataFrames
